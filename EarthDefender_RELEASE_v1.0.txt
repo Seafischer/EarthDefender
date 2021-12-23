@@ -89,7 +89,7 @@ var bombTriggeredAt = 0;
 var bombLoc=[];
 var bombActive=false;
 var bombSpeed = 80; # how many ticks does the pulse need to fully expand
-var alienSprite = "💀";
+var alienSprite = "👽";
 var playerSprite = "🌎";
 
 
@@ -167,7 +167,7 @@ var sound2 = StereoSound(l_samples, r_samples, 20000);
 #------------------------------Begin of Menu/Tutorial-------------------------------------------#
 
 #First Screen Welcome
-function drawMenuControls(showLeft=true,showRight=true,showStartPrompt=true,leftArrowString="BACK",rightArrowString="NEXT"){
+function drawMenuControls(showLeft=true,showRight=true,showStartPrompt=true,leftArrowString="BACK - Left Arrow",rightArrowString="NEXT - Right Arrow"){
 	canvas.setFillColor(0.5,0.5,0.5);
 	if showLeft then {
 		canvas.setFont("Wingdings", 50);
@@ -189,7 +189,7 @@ function drawMenuControls(showLeft=true,showRight=true,showStartPrompt=true,left
 		canvas.setFillColor(0.5,0.5,0.5);
 		canvas.setFont("Helvetica", 18);
 		canvas.setTextAlign("center");
-		canvas.text(canvwid*0.5,canvhei-36,"Press Space to start...");
+		canvas.text(canvwid*0.5,canvhei-72,"Press Space to start...");
 	}
 }
 
@@ -378,7 +378,7 @@ function menuPg3(){
 
 }
 
-#Third Screen Tutorial page two: powerups, battlezone, bomb
+#Third Screen Tutorial page two: powerups,  bomb
 function menuPg4(){
 		canvas.setLineColor(0,0,0);
 		canvas.setLineWidth(1);
@@ -424,7 +424,7 @@ function menuPg4(){
 				canvas.setFillColor(1,0,1);
 				canvas.setFont("Helvetica", 20);
 				canvas.setTextAlign("right");
-				canvas.text(xPos-size-20,yPos-10,"+Bomb");
+				canvas.text(xPos-size-20,yPos-25,"+1 Bomb\nUse with\nSpacebar");
 			}
 			
 			# enlarge sprite
@@ -555,7 +555,7 @@ function menuPg5(){
 	canvas.setTextAlign("center");
 	canvas.text(canvwid/2,canvhei*0.82,"Stay in the Zone and dodge\nthe projectiles!\nSurvive as long as you can!");
 	
-	drawMenuControls();
+	drawMenuControls(true,true,false);
 	
 }
 #sixth screen Mission Start Ready ?
@@ -1229,6 +1229,7 @@ function resetGameState(){
 		yMove=0;
 		invulnStart=0;
 		ooBZTimer=0;
+		var bzSpawnTime=0;
 		bzCounter=0;
 		p = Player();
 		delayStart = 0-playerDebuffDuration;
