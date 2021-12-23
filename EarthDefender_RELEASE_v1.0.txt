@@ -1,0 +1,1441 @@
+
+
+
+
+
+
+
+
+#-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-/\-#
+#																						 	#
+#									   Earth Defender 									 	#
+# 									        _____										 	#	
+# 									    ,-:` \;',`'-, 									 	#
+# 									  .'-;_,;  ':-;_,'.									 	#
+# 									 /;   '/    ,  _`.-\								 	#
+# 									| '`. (`     /` ` \`|								 	#
+# 								   [:.  `\`-.   \_   /   ]								 	#
+# 									|     (   `,  .`\ ;'|								 	#
+# 									 \     | .'     `-'/								 	#
+# 									  `.   ;/        .'									 	#			
+# 									    `'-._____.										 	#
+#																						 	#
+#					by Cornelius and Moritz, mathematically supported by Oskar			 	#
+#-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#------------------------------Begin of global variables---------------------------------#
+# Modifiable by player:
+var playBGM = true; # True-> Plays background music, False-> doesnt, press "m" at any moment in game to switch between those
+var starCnt = 200; # Number of stars to render in the background, less increase performance. 200 is fine
+var gameMode = "ITZ"; # ITZ, More Gamemodes to come
+
+
+
+
+# Modifiable by Dev:
+var playControlSwitch = false; # true= Player follows mouse, false= player always on top of mouse
+var provideMousePosDelay = 8;
+var playerSize = 10;
+var waveNum = 0; #Starting Wave before first game tick, enemyCnt scales with this
+var invulnDur=60*1; # player invulnerability lasts for x seconds (60 game ticks * x)
+var enemyCnt=8;#enemys that spawn on first wave
+var enemysCanBeHit=false; # set to true if you want enemys to be defeated by projectiles, false if you don't
+var reloadAnimInterval=2; #smaller is more detailled, Higher is more performand on high enemy counts, modifies reload animation details on enemys
+var loseHPOffset = 60; # 
+var starMoveSpeed = 0.0003;
+var enemyProjectileVelocity = 0.09;
+var enemySize=10;
+var damagePerTick=2;
+var maxHP = 100;
+var bzSpawnInterv = 12; # Every x-2 seconds a new battlezone spawns
+var bzSafeTime = 1; # delay x Seconds after Battlezone spawned for begin of DOT outside the zone
+var bzX=canvas.width()/2; # battleZone xPos
+var bzY=canvas.height()/2; # BattleZone yPos
+var bzXO=bzX;
+var bzYO=bzY;
+var xMove=0;
+var yMove=0;
+var bzSize=150;
+var bzSpawnTime=0;
+var dmgFromBZ=0.1;
+var frequency = 0.01; # Rainbow speed
+var enemysCanFire = true;
+var godMode=false;												#godmode
+var powerUpSize = 12;
+var playerBuffDuration = 300; # Buffs on player lasts x ticks
+var playerDebuffDuration = 300; # Debuffs on player lasts x ticks
+var enemyFireRate = 60;
+var bombs=1;
+var bombTriggeredAt = 0;
+var bombLoc=[];
+var bombActive=false;
+var bombSpeed = 80; # how many ticks does the pulse need to fully expand
+var alienSprite = "💀";
+var playerSprite = "🌎";
+
+
+# Static, !!DO NOT MODIFY!!:
+var gameDur=0; #counts up on every game tick, many features depend on this counter
+var pauseDur=0; #as gameDur is stopped during pause screen, this is the time counter for pause, gets reset to 0 on each pause
+var gCanvWid = canvas.width()/2; #QoL
+var gCanvHei = canvas.height()/2; #QoL
+var score = 0; # score
+var envSeed = []; # environment Random vars
+for 0:3 do envSeed.push(math.random()); # saving environment Random vars for the game
+var starPos = []; # holds star position coefficients
+for 0:starCnt do starPos.push([math.random(),math.random(),math.random()]); # gen and Saving Position of stars for the game
+var activeEnemy=[]; # holds active enemy instances
+var activeProjectile=[]; # holds active projectile instances
+var invulnStart=0; # saves gameDur at the start of invulnerability
+var paused = false; # Pauses the game on keypress (Escape)
+var playerDead = false; #Pauses the game on playerdeath
+var lastMousePos = [];
+var lastMouseTick=[];
+var ooBZTimer=0;
+var bzCounter=1;
+var activePowerUp=[];
+var puTypeList=["restore", "shrink", "bomb", "enlarge", "delay","empty2"];
+var puTypeVal={restore: 25, shrink: 0.5, bomb: 1, enlarge: 1.2, delay:5, empty2:0};
+var delayStart = 0-playerDebuffDuration;
+var enlStart = 0-playerDebuffDuration;
+var shrinkStart = 0-playerBuffDuration;
+var slowModeStart = 0-playerBuffDuration;
+var speedUpStart = 0-playerDebuffDuration;
+var pyth = playerSize*100;
+#Menu related
+var canvhei=canvas.height();
+var canvwid=canvas.width();
+var activeMenuPage=1;
+var startGame=false;
+var showIntro = true;
+
+
+#------------------------------End of global variables-----------------------------------#
+# Debugging:
+# canvas.text(canvas.width()/2,400,"dgl" + gameDur + " lh:  "+lastHit);
+
+#------------------------------Begin of Sounds-------------------------------------------#
+
+use namespace math;
+use namespace audio;
+
+var durationInSeconds = 2;
+var l_freq = 72; # frequency in Hz
+var r_freq = 84;
+var sampleRate = 8000; # sampleRate in Hz
+
+var l_samples = [];
+var r_samples = [];
+
+for var i in 0:(sampleRate) do
+{
+    l_samples.push(sin( i * (l_freq / sampleRate) * 3 * pi()));
+}
+
+for var i in 0:(sampleRate) do
+{
+    r_samples.push(sin( i * (r_freq / sampleRate) * 2.5 * pi()));
+}
+
+var sound = StereoSound(l_samples, r_samples, sampleRate);
+var sound2 = StereoSound(l_samples, r_samples, 20000);
+
+#------------------------------End of Sounds-------------------------------------------#
+
+
+
+
+#------------------------------Begin of Menu/Tutorial-------------------------------------------#
+
+#First Screen Welcome
+function drawMenuControls(showLeft=true,showRight=true,showStartPrompt=true,leftArrowString="BACK",rightArrowString="NEXT"){
+	canvas.setFillColor(0.5,0.5,0.5);
+	if showLeft then {
+		canvas.setFont("Wingdings", 50);
+		canvas.setTextAlign("left");
+		canvas.text(10,canvhei-50,"ç");
+		canvas.setFont("Helvetica", 18);
+		canvas.setTextAlign("left");
+		canvas.text(80,canvhei-36,leftArrowString);
+	}
+	if showRight then {
+		canvas.setFont("Wingdings", 50);
+		canvas.setTextAlign("right");
+		canvas.text(canvwid-10,canvhei-50,"è");
+		canvas.setFont("Helvetica", 18);
+		canvas.setTextAlign("right");
+		canvas.text(canvwid-80,canvhei-36,rightArrowString);
+	}
+	if showStartPrompt then{
+		canvas.setFillColor(0.5,0.5,0.5);
+		canvas.setFont("Helvetica", 18);
+		canvas.setTextAlign("center");
+		canvas.text(canvwid*0.5,canvhei-36,"Press Space to start...");
+	}
+}
+
+function menuPg1(){
+	var playerXTutorial=pauseDur*2.5-250;
+	var playerYTutorial=canvhei/4;
+	var textX = canvwid/2;
+	var textY = pauseDur*1.70;
+	canvas.setFillColor(1,0,1);
+	canvas.setFont("Helvetica", 30);
+	canvas.setTextAlign("center");
+	canvas.text(textX-76,textY,"Welcome to...");
+	canvas.setFont("Helvetica", 50);
+	canvas.setTextAlign("center");
+	canvas.text(textX,textY,"\nEarth Defender");
+	canvas.setFont("Helvetica", 30);
+	canvas.setTextAlign("center");
+	canvas.text(textX,textY,"\n\n\n\nby Cornelius and Moritz");
+	
+	function drawEarth(newX,newY){
+		var size = 40;
+		var x=newX;
+		var y=newY;
+		var textX = x + 4*size;
+		var textY = y-0.5*size;
+		
+		
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Roboto",size*2);
+		canvas.setTextAlign("center");
+		canvas.text(x,y-size*0.8,playerSprite);
+		canvas.setFillColor(0.2,0.2,1,0.2);
+		canvas.fillCircle(x,y,size+3);
+	}
+	function drawEnemy(newX,newY){
+		var playX=newX;
+		var playY=newY;
+		var size = 40;
+		var x = newX-300;
+		var y = newY;
+		var nosePoints;
+		var textX = x - 5*size;
+		var textY = y - 0.5*size;
+		
+		
+		
+		
+		function rotate(xR,yR,xE,yE,xP,yP){									
+			var phi = math.atan2(yE-yP,xE-xP)+225*180/math.pi();
+			var xRD = xE+(xR-xE)*math.cos(phi)-(yR-yE)*math.sin(phi);
+			var yRD = yE+(xR-xE)*math.sin(phi)+(yR-yE)*math.cos(phi);
+			return [xRD,yRD];
+		}
+		
+		canvas.setLineColor(0,0,0);
+		canvas.setFillColor(1,0,0);
+		canvas.setLineWidth(1);
+		nosePoints=[
+					rotate(x-size*0.5,y-size*0.85,x,y,playX,playY),
+					rotate(x+size*0.5,y-size*0.85,x,y,playX,playY),
+					rotate(x,y-size*0.85*2,x,y,playX,playY)
+					];
+		canvas.frameArea(nosePoints);	
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Roboto",size*2);
+		canvas.setTextAlign("center");
+		canvas.text(x,y-size*0.8,alienSprite);
+	}
+	
+	function drawProjectile(){
+		canvas.setFillColor(1,1,0);
+		canvas.setLineColor(1,0,0);
+		canvas.frameCircle(pauseDur*3.5-700,canvhei/4,15);
+	
+	}
+	
+	drawEarth(playerXTutorial,playerYTutorial);
+	if playerXTutorial>=canvwid/2 then drawProjectile();
+	drawEnemy(playerXTutorial,playerYTutorial);
+	
+	
+	if playerXTutorial>canvwid+400 then activeMenuPage=2;
+}
+
+
+
+
+#Second Screen Turtorial page one: player, enemy, projectile
+function menuPg2(external=false){
+	var playerXTutorial=canvwid/4;
+	var playerYTutorial=canvhei/4;
+	
+	function drawEarth(newX,newY){
+		var size = 50;
+		var x=newX;
+		var y=newY;
+		var textX = x + 4*size;
+		var textY = y-0.5*size;
+		
+		
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Roboto",size*2);
+		canvas.setTextAlign("center");
+		canvas.text(x,y-size*0.8,playerSprite);
+		canvas.setFillColor(0.2,0.2,1,0.2);
+		canvas.fillCircle(x,y,size+3);
+		
+		canvas.setFillColor(1,0,1);
+		canvas.setFont("Helvetica", 20);
+		canvas.setTextAlign("left");
+		canvas.text(textX-76,textY,"You control the Earth\nwith your cursor!");
+	}
+	function drawEnemy(newX,newY){
+		var playX=newX;
+		var playY=newY;
+		var size = 50;
+		var x = canvwid*0.75;
+		var y = canvhei*0.75;
+		var nosePoints;
+		var textX = x - 5*size;
+		var textY = y-0.5*size;
+		
+		
+		
+		
+		function rotate(xR,yR,xE,yE,xP,yP){									
+			var phi = math.atan2(yE-yP,xE-xP)+225*180/math.pi();
+			var xRD = xE+(xR-xE)*math.cos(phi)-(yR-yE)*math.sin(phi);
+			var yRD = yE+(xR-xE)*math.sin(phi)+(yR-yE)*math.cos(phi);
+			return [xRD,yRD];
+		}
+		
+		canvas.setLineColor(0,0,0);
+		canvas.setFillColor(1,0,0);
+		canvas.setLineWidth(1);
+		nosePoints=[
+					rotate(x-size*0.5,y-size*0.85,x,y,playX,playY),
+					rotate(x+size*0.5,y-size*0.85,x,y,playX,playY),
+					rotate(x,y-size*0.85*2,x,y,playX,playY)
+					];
+		canvas.frameArea(nosePoints);	
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Roboto",size*2);
+		canvas.setTextAlign("center");
+		canvas.text(x,y-size*0.8,alienSprite);
+		
+		
+		
+		
+		canvas.setFillColor(1,0,1);
+		canvas.setFont("Helvetica", 20);
+		canvas.setTextAlign("left");
+		canvas.text(textX-76,textY,"These Aliens are trying\nto destroy it!");
+
+
+
+
+	}
+	
+	drawEarth(playerXTutorial,playerYTutorial);
+	drawEnemy(playerXTutorial,playerYTutorial);
+	if not external then drawMenuControls(false);
+	else drawMenuControls();
+	
+	
+	
+}
+
+function menuPg3(){
+	
+	function drawProjectile(){
+		canvas.setFillColor(1,1,0);
+		canvas.setLineColor(1,0,0);
+		canvas.frameCircle(canvwid/2,canvhei/2,20);
+		
+		canvas.setFillColor(1,0,1);
+		canvas.setFont("Helvetica", 20);
+		canvas.setTextAlign("left");
+		canvas.text(canvwid/2+40,canvhei/2-20,"Try to dodge\ntheir projectiles!");
+	
+	}
+	
+	menuPg2(true);
+	drawProjectile();
+
+
+}
+
+#Third Screen Tutorial page two: powerups, battlezone, bomb
+function menuPg4(){
+		canvas.setLineColor(0,0,0);
+		canvas.setLineWidth(1);
+			# restore sprite
+			function drawRestoreSprite(xPos,yPos,size){
+				canvas.setFillColor(0,1,0);
+				canvas.frameCircle(xPos,yPos,size);
+				canvas.setFillColor(0.1,0.1,0.1);
+# 				canvas.fillRect(xPos-(size*(3/5)),yPos-(0.5*((size)/3)),size*(3/5)*2,(size)/3);
+# 				canvas.fillRect(xPos-(0.5*(size/3)),yPos-(size*(3/5)),size/3,size*(3/5)*2);
+				canvas.setFont("Roboto",size*1.8);
+				canvas.setTextAlign("center");
+				canvas.text(xPos,yPos-size*0.67,"❤");
+				
+				canvas.setFillColor(1,0,1);
+				canvas.setFont("Helvetica", 20);
+				canvas.setTextAlign("right");
+				canvas.text(xPos-size-20,yPos-10,"Restore");
+			}
+			# shrink sprite
+			function drawShrinkSprite(xPos,yPos,size){
+				canvas.setFillColor(0,1,0);
+				canvas.frameCircle(xPos,yPos,size);
+				canvas.setFillColor(0.1,0.1,0.1);
+				canvas.setFont("Roboto",size*1.8);
+				canvas.setTextAlign("center");
+				canvas.text(xPos,yPos-size*0.67,"🡻");
+				
+				canvas.setFillColor(1,0,1);
+				canvas.setFont("Helvetica", 20);
+				canvas.setTextAlign("right");
+				canvas.text(xPos-size-20,yPos-10,"Shrink");
+			}
+			# Bomb sprite
+			function drawBombSprite(xPos,yPos,size){
+				canvas.setTextAlign("center");
+				canvas.setFillColor(0,1,0);
+				canvas.frameCircle(xPos,yPos,size);
+				canvas.setFillColor(0.1,0.1,0.1);
+				canvas.setFont("Wingdings",size*2);
+				canvas.text(xPos+size*0.25,yPos-size*0.84,"M");
+				
+				canvas.setFillColor(1,0,1);
+				canvas.setFont("Helvetica", 20);
+				canvas.setTextAlign("right");
+				canvas.text(xPos-size-20,yPos-10,"+Bomb");
+			}
+			
+			# enlarge sprite
+			function drawEnlargeSprite(xPos,yPos,size){
+				canvas.setFillColor(1,0,0);
+				canvas.frameCircle(xPos,yPos,size);
+				canvas.setFillColor(0.1,0.1,0.1);
+				canvas.setFont("Roboto",size*1.8);
+				canvas.setTextAlign("center");
+				canvas.text(xPos,yPos-size*0.69,"🡹");
+				
+				
+				canvas.setFillColor(1,0,1);
+				canvas.setFont("Helvetica", 20);
+				canvas.setTextAlign("left");
+				canvas.text(xPos+size+20,yPos-10,"Enlarge");
+			}
+			# delay sprite
+			function drawDelaySprite(xPos,yPos,size){
+				var delay1Points = [
+									[xPos+(0.5*(size/2.5))+size/3,yPos+(size*(3/4))],
+									[xPos-0.5*(size/2.5)+size/3,yPos+(size*(3/4))],#
+									[xPos-0.5*(size/2.5)+size/3,yPos],
+									[xPos-((size/2.5)*1.5)+size/3,yPos],
+									[xPos+size/3,yPos-size*3/4],#
+									[xPos+((size/2.5)*1.5)+size/3,yPos],
+									[xPos+0.5*(size/2.5)+size/3,yPos]					
+								];	
+				var delay2Points = [
+									[xPos+(0.5*(size/2.5))-size*0.1,yPos+(size*(3/4))],
+									[xPos-0.5*(size/2.5),yPos+(size*(3/4))],#
+									[xPos-0.5*(size/2.5),yPos+size*0.1],
+									[xPos-((size/2.5)*1.5)+size*0.1,yPos+size*0.1],
+									[xPos-size*0.05,yPos-size*3/4+size*0.1],#
+									[xPos+((size/2.5)*1.5)-size*0.2,yPos+size*0.1],
+									[xPos+0.5*(size/2.5)-size*0.1,yPos+size*0.1]					
+								];	
+				var delay3Points = [
+									[xPos+(0.5*(size/2.5))-size/3-size*0.1,yPos+(size*(3/4))],
+									[xPos-0.5*(size/2.5)-size/3,yPos+(size*(3/4))],#lu
+									[xPos-0.5*(size/2.5)-size/3,yPos+size*0.2],#lm
+									[xPos-((size/2.5)*1.5)-size/3+size*0.1,yPos+size*0.2],
+									[xPos-size/3-size*0.05,yPos-size*3/4+size*0.2],#mo
+									[xPos+((size/2.5)*1.5)-size/3-size*0.2,yPos+size*0.2],
+									[xPos+0.5*(size/2.5)-size/3-size*0.1,yPos+size*0.2]					
+								];	
+								
+				canvas.setFillColor(1,0,0);
+				canvas.frameCircle(xPos,yPos,size);
+				canvas.setFillColor(0.5,0.5,0.5,0.5);
+				canvas.frameArea(delay3Points);
+				canvas.setFillColor(0.6,0.6,0.6,0.8);
+				canvas.frameArea(delay2Points);
+				canvas.setFillColor(0.1,0.1,0.1);
+				canvas.frameArea(delay1Points);
+				
+				canvas.setFillColor(1,0,1);
+				canvas.setFont("Helvetica", 20);
+				canvas.setTextAlign("left");
+				canvas.text(xPos+size+20,yPos-10,"Delay");
+				
+				
+		}
+		
+		drawRestoreSprite(canvwid/2-canvwid/9,canvhei*0.25,40);
+		drawBombSprite(canvwid/2-canvwid/9,canvhei*0.5,40);
+		drawShrinkSprite(canvwid/2-canvwid/9,canvhei*0.75,40);
+		drawDelaySprite(canvwid/2+canvwid/9,canvhei*0.25,40);
+		drawEnlargeSprite(canvwid/2+canvwid/9,canvhei*0.5,40);
+		canvas.setFillColor(1,0,1);
+		canvas.setFont("Helvetica", 50);
+		canvas.setTextAlign("center");
+		canvas.text(canvwid/2,canvhei*0.05,"PowerUps");
+		drawMenuControls();
+}
+#Fidth screen Battlezone
+function menuPg5(){
+	
+	function drawEarth(newX,newY){
+		var size = 10;
+		var x=newX;
+		var y=newY;
+		var textX = x + 4*size;
+		var textY = y-0.5*size;
+		
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Roboto",size*2);
+		canvas.setTextAlign("center");
+		canvas.text(x,y-size*0.8,playerSprite);
+		canvas.setFillColor(0.2,0.2,1,0.2);
+		canvas.fillCircle(x,y,size+3);
+	}
+	
+	function drawProjectile(x,y){
+		canvas.setFillColor(1,1,0);
+		canvas.setLineColor(1,0,0);
+		canvas.fillCircle(x,y,3);	
+	}
+	
+	
+	
+	
+	
+	canvas.setFillColor(1,0,1);
+	canvas.setFont("Helvetica", 30);
+	canvas.setTextAlign("center");
+	canvas.text(canvwid/2,canvhei*0.05,"Gamemode:\nIn tha Zone!");
+	
+	canvas.setLineColor(1,0,0);
+	canvas.setLineWidth(5);
+	canvas.circle(canvwid*0.5,canvhei*0.5,150);
+	
+	drawEarth(canvwid/2+40,canvhei/2+60);
+	drawProjectile(canvwid/2+20,canvhei/2-20);
+	drawProjectile(canvwid/2+50,canvhei/2-100);
+	drawProjectile(canvwid/2-10,canvhei/2-140);
+	drawProjectile(canvwid/2+80,canvhei/2+30);
+	drawProjectile(canvwid/2+12,canvhei/2+21);
+	drawProjectile(canvwid/2+167,canvhei/2-151);
+	drawProjectile(canvwid/2-46,canvhei/2+21);
+	drawProjectile(canvwid/2+135,canvhei/2+4);
+	drawProjectile(canvwid/2-42,canvhei/2+55);
+	drawProjectile(canvwid/2-156,canvhei/2+121);
+	drawProjectile(canvwid/2+23,canvhei/2+6);
+	
+	canvas.setFillColor(1,0,1);
+	canvas.setFont("Helvetica", 20);
+	canvas.setTextAlign("center");
+	canvas.text(canvwid/2,canvhei*0.82,"Stay in the Zone and dodge\nthe projectiles!\nSurvive as long as you can!");
+	
+	drawMenuControls();
+	
+}
+#sixth screen Mission Start Ready ?
+function menuPg6(){
+	canvas.setFillColor(1,0,1);
+	canvas.setFont("Helvetica", 50);
+	canvas.setTextAlign("center");
+	canvas.text(canvwid*0.5,canvhei*0.4,"Are you ready?");
+	
+	canvas.setFillColor(1,0,1);
+	canvas.setFont("Helvetica", 20);
+	canvas.setTextAlign("center");
+	canvas.text(canvwid*0.5,canvhei*0.6,"Press Space to start...");
+	
+	
+	drawMenuControls(true,false,false);
+}
+
+#------------------------------End of Menu/Tutorial-------------------------------------------#
+
+
+#------------------------------Begin of class Player-------------------------------------------#
+																								
+class Player{
+	private:
+		var health;
+		var speed;
+		var size;
+		var x;
+		var y;
+		var oldHealth;
+		var lastHit;
+		var xOld;
+		var	yOld;
+		
+	public:
+		function draw(){
+			if  not (gameDur-invulnDur<=invulnStart and gameDur%10<=5) then{
+			if playControlSwitch then{
+				canvas.setFillColor(1,1,1);
+				canvas.setFont("Roboto",size*2);
+				canvas.setTextAlign("center");
+				canvas.text(xOld,yOld-size*0.8,playerSprite);
+				canvas.setFillColor(0.2,0.2,1,0.2);
+				canvas.fillCircle(xOld,yOld,size+3);
+				
+
+			}
+			else{
+				canvas.setFillColor(1,1,1);
+				canvas.setFont("Roboto",size*2);
+				canvas.setTextAlign("center");
+				canvas.text(x,y-size*0.8,playerSprite);
+				canvas.setFillColor(0.2,0.2,1,0.2);
+				canvas.fillCircle(x,y,size+3);
+			}
+				
+			}
+		}
+	
+	constructor(){
+			x = gCanvWid;
+			y = gCanvHei;
+			xOld=x;
+			yOld=y;
+			health = maxHP;
+			oldHealth= maxHP;
+			lastHit=0;
+			speed = 20;
+			size = playerSize;
+		}
+	
+	
+	function move(mPosX,mPosY){
+		x=mPosX;
+		y=mPosY;
+	}
+	
+	function getHP(){return health;}	
+	function updHPB(){
+		if health<oldHealth and gameDur-lastHit>loseHPOffset then{
+			oldHealth=oldHealth-damagePerTick;
+			canvas.setFillColor(1,1,1);
+
+		}
+	}
+	
+	function getOHP(){return oldHealth;}
+	
+	
+	function hasBeenHit(damage=0, ooz=false){
+		if not godMode then {
+			if ooz then{
+				health-=damage;	
+			}
+			else{
+				lastHit=gameDur;
+				health-=damage;	
+				invulnStart=gameDur;
+				if playBGM then{
+					sound2.play();
+				}
+			}
+		}	
+		
+	}
+	
+	#function getDamagePerTick(){return damagePerTick;}
+	
+	function getX(){return xOld;}
+	function setOldX(value){xOld=value;}
+	function getY(){return yOld;}
+	function setOldY(value){yOld=value;}
+	function getTrueX(){return x;}
+	
+	function getTrueY(){return y;}
+	
+	function getSize(){return size;}
+	
+	function getMaxHP(){return maxHP;}
+	
+	function isInvuln(){if gameDur-invulnDur<=invulnStart then return true; return false;}
+	
+	function heal(amount){if health+amount<maxHP then health+=amount; else health=maxHP;}
+	function setSize(newSize){size=newSize;}
+	
+
+}
+
+#------------------------------End of class Player-------------------------------------------#
+
+
+
+var p = Player();			# initialize player
+
+
+
+#------------------------------Begin of class Projectile-------------------------------------#		
+
+class Projectile{																				
+	
+	private:
+		var acc=0;
+		var size=3;
+		var traj=[2,2];
+		var x=100;
+		var y=100;
+		var vel=0.09;
+		var collDmg=10;
+		var projSpawnTick=0;
+		var invuln=true;
+		
+	public:
+		constructor(origin,trajectory){
+			x=origin[0];
+			y=origin[1];
+			traj=trajectory;
+			projSpawnTick=gameDur;
+			vel=enemyProjectileVelocity;
+		}
+		
+		function draw(last=false){
+			if gameDur-projSpawnTick > 10 then invuln=false;
+			x+=traj[0]*vel;
+			y+=traj[1]*vel;
+			vel+=acc;
+			if (gameDur-projSpawnTick)%30>=15 then canvas.setFillColor(1,1,0);		
+			else canvas.setFillColor(1,0,0);
+			if last then canvas.fillCircle(x,y,size*3);
+			else canvas.fillCircle(x,y,size);
+		}
+		function getCollDmg(){return collDmg;}
+		function getSize(){return size;}
+		function getX(){return x;}
+		function getY(){return y;}
+		function isInvuln(){return invuln;}
+
+}
+			
+#------------------------------End of class Projectile-------------------------------------#				
+			
+			
+			
+#------------------------------Begin of class PowerUp----------------------------------------#
+
+class PowerUp{
+
+	private:
+		var isType=0;
+		var xPos;
+		var yPos;
+		var size;
+		
+	public:
+		constructor(x,y,puType){
+			xPos = x;
+			yPos = y;
+			isType = puType;
+			size = powerUpSize; #retrieved from global Variable powerUpSize
+		}
+		
+	function getX(){return xPos;}
+	function getY(){return yPos;}
+	function getSize(){return size;}
+	function getType(){return isType;}
+	
+	function trigger(){
+		if isType==0 then{
+			p.heal(puTypeVal["restore"]);
+		}else if isType==1 then{
+			shrinkStart=gameDur;
+			p.setSize(playerSize*puTypeVal["shrink"]);
+		}else if isType==2 then{
+			bombs+=1;
+		}else if isType==3 then{
+			enlStart=gameDur;
+			p.setSize(playerSize*puTypeVal["enlarge"]);
+		}else if isType==4 then{
+			playControlSwitch=true;
+			delayStart=gameDur;
+		}else if isType==5 then{
+		}				
+	}	
+	
+	function draw(){
+		
+		if isType==0 then{
+			# restore sprite
+			canvas.setFillColor(0,1,0);
+			canvas.frameCircle(xPos,yPos,size);
+			canvas.setFillColor(0.1,0.1,0.1);
+			canvas.setFont("Roboto",size*1.8);
+			canvas.setTextAlign("center");
+			canvas.text(xPos,yPos-size*0.67,"❤");
+		}else if isType==1 then{
+			# shrink sprite
+			canvas.setFillColor(0,1,0);
+			canvas.frameCircle(xPos,yPos,size);
+			canvas.setFillColor(0.1,0.1,0.1);
+			canvas.setFont("Roboto",size*1.8);
+			canvas.setTextAlign("center");
+			canvas.text(xPos,yPos-size*0.67,"🡻");
+		}else if isType==2 then{
+			# Bomb sprite
+			canvas.setTextAlign("center");
+			canvas.setFillColor(0,1,0);
+			canvas.frameCircle(xPos,yPos,size);
+			canvas.setFillColor(0.1,0.1,0.1);
+			canvas.setFont("Wingdings",size*2);
+			canvas.text(xPos+size*0.25,yPos-size*0.84,"M");
+		}else if isType==3 then{
+			
+			# enlarge sprite
+			canvas.setFillColor(1,0,0);
+			canvas.frameCircle(xPos,yPos,size);
+			canvas.setFillColor(0.1,0.1,0.1);
+			canvas.setFont("Roboto",size*1.8);
+			canvas.setTextAlign("center");
+			canvas.text(xPos,yPos-size*0.69,"🡹");
+			
+		}else if isType==4 then{
+			# delay sprite
+			var delay1Points = [
+								[xPos+(0.5*(size/2.5))+size/3,yPos+(size*(3/4))],
+								[xPos-0.5*(size/2.5)+size/3,yPos+(size*(3/4))],#
+								[xPos-0.5*(size/2.5)+size/3,yPos],
+								[xPos-((size/2.5)*1.5)+size/3,yPos],
+								[xPos+size/3,yPos-size*3/4],#
+								[xPos+((size/2.5)*1.5)+size/3,yPos],
+								[xPos+0.5*(size/2.5)+size/3,yPos]					
+							];	
+			var delay2Points = [
+								[xPos+(0.5*(size/2.5))-size*0.1,yPos+(size*(3/4))],
+								[xPos-0.5*(size/2.5),yPos+(size*(3/4))],#
+								[xPos-0.5*(size/2.5),yPos+size*0.1],
+								[xPos-((size/2.5)*1.5)+size*0.1,yPos+size*0.1],
+								[xPos-size*0.05,yPos-size*3/4+size*0.1],#
+								[xPos+((size/2.5)*1.5)-size*0.2,yPos+size*0.1],
+								[xPos+0.5*(size/2.5)-size*0.1,yPos+size*0.1]					
+							];	
+			var delay3Points = [
+								[xPos+(0.5*(size/2.5))-size/3-size*0.1,yPos+(size*(3/4))],
+								[xPos-0.5*(size/2.5)-size/3,yPos+(size*(3/4))],#lu
+								[xPos-0.5*(size/2.5)-size/3,yPos+size*0.2],#lm
+								[xPos-((size/2.5)*1.5)-size/3+size*0.1,yPos+size*0.2],
+								[xPos-size/3-size*0.05,yPos-size*3/4+size*0.2],#mo
+								[xPos+((size/2.5)*1.5)-size/3-size*0.2,yPos+size*0.2],
+								[xPos+0.5*(size/2.5)-size/3-size*0.1,yPos+size*0.2]					
+							];	
+							
+			canvas.setFillColor(1,0,0);
+			canvas.frameCircle(xPos,yPos,size);
+			canvas.setFillColor(0.5,0.5,0.5,0.5);
+			canvas.frameArea(delay3Points);
+			canvas.setFillColor(0.6,0.6,0.6,0.8);
+			canvas.frameArea(delay2Points);
+			canvas.setFillColor(0.1,0.1,0.1);
+			canvas.frameArea(delay1Points);
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+#------------------------------End of class PowerUp-------------------------------------#
+
+
+			
+																							
+#------------------------------Begin of class Enemy----------------------------------------#	
+class Enemy{
+	private:
+		var status = true;
+		var size = 10;
+		var x = 100;
+		var y = 100;
+		var collDmg = 25;
+		var nosePoints;
+		var fireRate; # Fire every X ticks, smaller is faster, MUST BE DIVISABLE BY reloadAnimInterval!!!
+		var lastShot=0;
+		var reloadAnimPoints=[]; 
+		var firstShot;
+		
+		
+		function rotate(xR,yR,xE,yE,xP,yP){									
+			var phi = math.atan2(yE-yP,xE-xP)+225*180/math.pi();#This was a PITA to get right... 225 is bruteforced, no idea why it works
+			var xRD = xE+(xR-xE)*math.cos(phi)-(yR-yE)*math.sin(phi);
+			var yRD = yE+(xR-xE)*math.sin(phi)+(yR-yE)*math.cos(phi);
+			return [xRD,yRD];
+		}
+		
+		
+		
+	public:
+		
+		function prepReloadAnimation(){
+			var temp=[];
+			var size = size+2;
+			reloadAnimPoints.push([x,y+size]);
+			for var i in 0:fireRate/reloadAnimInterval do{
+				var blockSize = 180/(fireRate/reloadAnimInterval);
+				var x1R = -(size*math.cos((-90+blockSize*i)*math.pi()/180))+x;
+				var x1L = x-(x1R-x);
+				var yR  = -(size*math.sin((-90+blockSize*i)*math.pi()/180))+y;
+				temp=deepcopy(reloadAnimPoints);
+				if i==0 then{
+					reloadAnimPoints.push([x,y+size]);
+					reloadAnimPoints.push([x1R,yR]);
+					reloadAnimPoints.push([x1L,yR]);
+				}else{
+					reloadAnimPoints.push([x1R,yR]);
+					reloadAnimPoints.push([x1L,yR]);
+				}
+				
+			}	
+			
+		}
+		
+		
+		constructor(x_,y_){
+			x=x_;
+			y=y_;
+			fireRate = enemyFireRate;
+			reloadAnimPoints=[];
+			prepReloadAnimation();
+			size=enemySize;
+			firstShot=true;
+			
+		}
+		
+		
+		
+		function draw(playX,playY){
+			fireRate = enemyFireRate;
+			canvas.setLineColor(0,0,0);
+			canvas.setFillColor(1,0,0);
+			canvas.setLineWidth(1);
+			nosePoints=[rotate(x-size*0.5,y-size*0.85,x,y,playX,playY),rotate(x+size*0.5,y-size*0.85,x,y,playX,playY),rotate(x,y-size*0.85*2,x,y,playX,playY)];
+					
+			
+			
+			#draw reloading animation overlay on top of enemy
+			canvas.setFillColor(0,1,1);	
+			if not firstShot then{
+				for var i in 0:Integer((gameDur-lastShot)/reloadAnimInterval) do{
+					var tempArray;
+					if i == 0 then{
+						tempArray=[reloadAnimPoints[0],reloadAnimPoints[0],reloadAnimPoints[1],reloadAnimPoints[2]];
+					}else{				
+						tempArray=[reloadAnimPoints[i*2],reloadAnimPoints[i*2-1],reloadAnimPoints[i*2+3],reloadAnimPoints[i*2+2]];
+					}
+					canvas.fillArea(tempArray);
+				}
+ 			}
+			canvas.setFillColor(1,0,0);
+			canvas.frameArea(nosePoints);	
+			canvas.setFillColor(1,1,1);
+			canvas.setFont("Roboto",size*2);
+			canvas.setTextAlign("center");
+			canvas.text(x,y-size*0.8,alienSprite);
+			
+		}
+		
+		
+		function launchPro(){
+			if enemysCanFire then{
+			activeProjectile.push(Projectile(nosePoints[2],[-(x-nosePoints[2][0]),-(y-nosePoints[2][1])]));
+			lastShot=gameDur;
+			firstShot=false;
+			}
+		}
+		
+		function hasBeenHit(){
+			status=false;
+		}
+		
+		
+		
+	
+		function getStatus(){return status;}
+		
+		function getX(){
+			return x;
+		}
+	
+		function getY(){
+			return y;
+		}
+		function getSize(){return size;}
+		function getCollDmg(){return collDmg;}
+		function getFirerate(){return fireRate;}
+		function getLastShot(){return lastShot;}
+
+}
+
+#------------------------------End of class Enemy----------------------------------------#
+
+function checkGameEffects(){
+		if gameDur-shrinkStart==playerBuffDuration then{
+				p.setSize(playerSize);
+		} else if gameDur-enlStart==playerDebuffDuration then{
+				p.setSize(playerSize);
+		}		
+		if gameDur-delayStart>=playerDebuffDuration then{
+			playControlSwitch=false;
+		}else playControlSwitch=true;
+	}
+
+																								# Draw Environment
+function drawEnv(){
+ 	canvas.setFillColor(0,0,0.021);
+# 	canvas.setFillColor(0.5,0,0.5,0.021); #pink CAUSES WTF MOMENT! NEEDS TO BE FIXED BY GLASI
+	canvas.fillRect(0,0,canvas.width(),canvas.height());
+	canvas.setFillColor(1,1,1);
+	for var i in 0:starCnt do{																	# Stars\\\\\\\\\\\\\
+		canvas.fillCircle(starPos[i][0]*canvas.width(),starPos[i][1]*canvas.height(),starPos[i][2]+0.242);
+	}
+	
+	
+	if startGame then{
+																								# generate EyeCandy
+		canvas.setFillColor(1,1,0);
+		var posX = 100;
+ 		var posY = 100;
+		var size = 25;#+duration;
+		canvas.fillCircle(posX,posY,size);
+		canvas.setFillColor(1,1,0,0.4);
+		canvas.fillCircle(posX,posY,size+5);
+		canvas.setFillColor(1,1,0,0.1);
+		canvas.fillCircle(posX,posY,size+10);
+	}
+}
+
+	
+function drawBattlezone(){													#battlezone
+	
+	if gameDur%(60*bzSpawnInterv)==0 then{
+		activePowerUp = [];
+		for 0:4 do {
+			activePowerUp.push(PowerUp((math.random()*canvas.width()-200)+200,(math.random()*canvas.height()-200)+200,Integer(math.random()*6)));	
+		}
+		bzXO=bzX;
+		bzYO=bzY;
+		bzX=math.random()*(canvas.width()-300)+150;
+		bzY=math.random()*(canvas.height()-300)+150;
+		if bzXO>bzX then{xMove=-((bzXO-bzX)/(60));}else{xMove=((bzX-bzXO)/(60));}
+		if bzYO>bzY then{yMove=-((bzYO-bzY)/(60));}else{yMove=((bzY-bzYO)/(60));}
+		bzCounter+=1;
+		bzSpawnTime=gameDur;
+	}
+	
+	var distanceFromCircle = math.sqrt(math.pow(p.getX()-bzX,2)+math.pow(p.getY()-bzY,2));
+	if gameDur%(60*bzSpawnInterv)<=60*bzSafeTime then{
+		if gameDur%60<30 then{
+			canvas.setLineWidth(1+6*(gameDur%30)/30);
+		}else{
+			canvas.setLineWidth(7-6*(gameDur%30)/30);
+		}
+		
+		bzXO+=xMove/bzSafeTime;
+		bzX=bzXO;
+		bzYO+=yMove/bzSafeTime;
+		bzY=bzYO;
+		
+		canvas.setLineColor(1,1,1);
+		canvas.circle(bzX,bzY,bzSize);
+		canvas.setFillColor(1,1,1);
+		canvas.setFont("Helvetica",21);
+		canvas.text(canvas.width()/2,40,"Proceed to the new Zone!");
+	}else{
+		if gameDur%60<30 then{
+			canvas.setLineWidth(1+6*(gameDur%30)/30);
+		}else{
+			canvas.setLineWidth(7-6*(gameDur%30)/30);
+		}
+		canvas.setLineColor(1,(gameDur%60)/60,0);
+		#is player inside the circle?
+		canvas.circle(bzX,bzY,bzSize);
+		if  distanceFromCircle>= bzSize+2 then{
+			canvas.setFillColor(1,1,0);
+			canvas.setFont("Helvetica",30+math.sin(frequency*10*gameDur)*5);
+			canvas.text(canvas.width()/2,40,"Get back in the Zone!");
+			ooBZTimer+=1;			
+			p.hasBeenHit(dmgFromBZ+ooBZTimer*0.009+distanceFromCircle*0.001,true);
+			
+			
+			canvas.setFillColor(1,0,0,0.04);
+			canvas.fillRect(0,0,canvas.width(),canvas.height());
+			canvas.setFillColor(0,1,0,0.08);
+			canvas.frameCircle(bzX,bzY,bzSize);
+		}else{
+			canvas.setFillColor(1,1,1);
+			canvas.setFont("Helvetica",21);
+			canvas.text(canvas.width()/2,40,"Stay in the Zone!\n"+(Integer(bzSpawnInterv-((gameDur-bzSpawnTime))/60))+"..."); 	
+			ooBZTimer=0;
+		}
+	}
+	
+	
+	
+}
+
+function triggerBomb(){
+	if bombs>=1 then{
+		bombs-=1;
+		bombLoc=[p.getX(),p.getY()];
+		bombActive=true;
+		bombTriggeredAt=gameDur;
+	}
+}
+function drawBomb(){
+	if bombActive then{
+		if 	(gameDur-bombTriggeredAt)*(pyth/bombSpeed)>=math.max(math.max(bombLoc[0],pyth-bombLoc[0]),math.max(bombLoc[1],pyth-bombLoc[1]))then{
+			bombActive=false;
+		}else{
+			canvas.setLineColor(1,0,1);
+			canvas.setLineWidth(4);
+			canvas.circle(bombLoc[0],bombLoc[1],((gameDur-bombTriggeredAt)*(pyth/bombSpeed)));
+			canvas.setLineColor(1,0,1,0.1);
+			canvas.setLineWidth(100);
+			canvas.circle(bombLoc[0],bombLoc[1],math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))-50),2)));
+			canvas.setLineColor(1,0,1,0.3);
+			canvas.setLineWidth(10);
+			canvas.circle(bombLoc[0],bombLoc[1],math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))-100),2)));
+			
+			
+		}
+	}
+
+}
+
+
+
+
+function drawUI(){
+	canvas.setTextAlign("center");
+	canvas.setFont("Helvetica",16);
+	canvas.setLineColor(1,1,1);
+	canvas.setFillColor(0,1,0);
+	if gameMode=="GRAV" then{
+		canvas.text(canvas.width()*0.9,canvas.height()-30,"no u: " + score); 							#UI
+		canvas.text(canvas.width()*0.1,canvas.height()-30,"Wave: " + waveNum);
+	}else if gameMode=="ITZ" then{ 							#UI
+		canvas.text(canvas.width()*0.1,canvas.height()-30,"Battlezone " + bzCounter);
+		if bombs==0 then canvas.setFillColor(1,0,0);
+		canvas.text(canvas.width()*0.9,canvas.height()-30,"Bombs: " + bombs);
+		canvas.setFillColor(0,1,0);
+	}
+	if p.getHP()<=0 then{
+		canvas.text(canvas.width()*0.40-10,canvas.height()-30,"HP: " + 0);
+	}else{
+		canvas.text(canvas.width()*0.40-10,canvas.height()-30,"HP: " + Integer(p.getHP()));
+	}
+	
+	
+	canvas.setFillColor(0.2,0,0);
+	canvas.fillRect(canvas.width()*0.45,canvas.height()-35,p.getMaxHP(),20);#hp bar underlay
+	
+	if p.getHP() <= 0 then {																		# UI on death
+		canvas.setFillColor(1,1,0);
+		canvas.text(canvas.width()*0.51,canvas.height()-30,"DED :(");
+		canvas.setTextAlign("center");	
+		canvas.setFont("Helvetica",30);
+		if gameMode=="ITZ" then{
+			canvas.setFillColor(1,0,0,0.2);			
+			canvas.fillRect(0,0,canvas.width(),canvas.height());			
+			canvas.setFillColor(0,0,0);
+			canvas.text(canvas.width()/2+3,canvas.height()/2-100+4,"Congratulations!\nYou've reached BattleZone: " + bzCounter);
+			canvas.setFillColor(1,1,1);
+			canvas.text(canvas.width()/2,canvas.height()/2-100,"Congratulations!\nYou've reached BattleZone: " + bzCounter);
+			
+		}else canvas.text(canvas.width()/2,canvas.height()/2,"U DEDed...");
+		
+		canvas.setFont("Helvetica",17);
+		canvas.setFillColor(0,0,0);
+		canvas.text(canvas.width()/2+3,canvas.height()/2+150+4,"\n press \"R\" to restart...");
+		canvas.setFillColor(1,1,1);
+		canvas.text(canvas.width()/2,canvas.height()/2+150,"\n press \"R\" to restart...");
+		playerDead=true;
+		
+	} else {																			# Health Bar Animations
+		canvas.setFillColor(0,1,0,0.5);
+		canvas.fillRect(canvas.width()*0.45,canvas.height()-35,p.getOHP(),20);
+		canvas.setFillColor(0,1,0);
+		canvas.fillRect(canvas.width()*0.45,canvas.height()-35,p.getHP(),20);
+		} 																						
+}
+
+
+
+
+function drawMenu(){																		#Menu
+	if paused then{ # pause Menu
+		var red  = math.sin(frequency*pauseDur + 0) * 127 + 128;
+        var green = math.sin(frequency*pauseDur + 2*math.pi()/3) * 127 + 128;
+        var blue  = math.sin(frequency*pauseDur + 4*math.pi()/3) * 127 + 128;
+        canvas.setFillColor(red/255,green/255,blue/255);  
+        canvas.setTextAlign("center");
+        canvas.setFont("Helvetica",30);
+        canvas.text(canvas.width()/2,canvas.height()/3,"PAUSED");
+        canvas.setTextAlign("center");
+        canvas.setFont("Helvetica",20);
+        canvas.text(canvas.width()/2,canvas.height()*0.8,"Press \"Escape\" to continue\nor \"Space\" to open Menu");
+    }
+	
+}
+
+
+
+function resetGameState(){
+		waveNum = 0;
+		gameDur = 0;
+		score = 0;
+		activeEnemy=[];
+		activeProjectile=[];
+		playerDead = false;
+		lastMousePos = [];
+		lastMouseTick=[];
+		bzSize=150;
+		bzY=canvas.height()/2;
+		bzX=canvas.width()/2;
+		bzXO=bzX;
+        bzYO=bzY;
+		xMove=0;
+		yMove=0;
+		invulnStart=0;
+		ooBZTimer=0;
+		bzCounter=0;
+		p = Player();
+		delayStart = 0-playerDebuffDuration;
+		enlStart = 0-playerDebuffDuration;
+		shrinkStart = 0-playerBuffDuration;	
+		bombs=1;
+		bombActive=false;
+}
+
+																							# Mouse Controls
+function moveToMouse (event){
+	lastMouseTick=[event.x,event.y];
+	p.move(event.x,event.y);
+	
+}							
+
+function keyInputHandler (event){
+	if not startGame then{
+		if event.key=="ArrowRight" and activeMenuPage<6 and activeMenuPage>1 then activeMenuPage+=1;
+		else if event.key=="ArrowLeft" and activeMenuPage>2 then activeMenuPage-=1;
+		if event.key==" " then {startGame = true; pauseDur=0; activeMenuPage=6;}
+		if event.key=="Escape" then activeMenuPage = 6;
+	}else
+	{
+		if event.key == "Escape" then{
+			if paused then {paused=false; pauseDur = 0;}
+			else {paused=true;}
+		}
+		if event.key == "r" then{
+			resetGameState();
+		}
+		if event.key == " " then{
+ 			if paused then {paused=false; startGame=false;}
+			else {triggerBomb();}
+		}
+	}
+	if event.key == "m" then playBGM = not playBGM;
+	
+	
+}
+																							# Gameloop onTick
+function onTick(event){
+	if playBGM and not sound.looping() then sound.startLoop();
+	else if not playBGM and sound.looping() then sound.stopLoop();
+	if not paused then{
+		for var i in 0:starPos.size() do{
+			if starPos[i][1] < 1 then {
+				starPos[i][1]+=starPos[i][2]*starMoveSpeed;
+				} else {
+					starPos[i][1]=0;	
+				}
+			}
+	}		
+	
+		
+		
+		
+		
+		if not startGame then{
+			pauseDur+=1;
+			drawEnv();
+			if activeMenuPage == 1 then menuPg1();
+			else if activeMenuPage == 2 then menuPg2();
+			else if activeMenuPage == 3 then menuPg3();
+			else if activeMenuPage == 4 then menuPg4();
+			else if activeMenuPage == 5 then menuPg5();
+			else if activeMenuPage == 6 then menuPg6();
+		}else{
+			lastMousePos.push([p.getTrueX(),p.getTrueY()]);
+		if lastMousePos.size()>provideMousePosDelay then{
+			lastMousePos.remove(0);
+		}												
+		p.setOldX(lastMousePos[0][0]);
+		p.setOldY(lastMousePos[0][1]);
+		
+	if not (paused or playerDead) then{	
+		gameDur+=1;
+		drawEnv();
+		if activeEnemy.size()==0 then{
+			activeProjectile=[];
+			waveNum+=1;
+			for var i in 0:(enemyCnt*waveNum) do {	# get some enemys
+				if i%2==0 then{
+					activeEnemy.push(Enemy(50,((canvas.height()-enemySize)/((enemyCnt*waveNum)))*(1+i)+enemySize));
+				}else{
+					activeEnemy.push(Enemy(canvas.width()-50,((canvas.height()-enemySize)/((enemyCnt*waveNum)))*(i)+enemySize));
+				}
+				
+			}
+		}
+		if gameMode=="ITZ" then{
+			drawBattlezone();	
+		}
+		p.updHPB();
+		
+		
+		
+		var projToDel=[];
+		var projIndex=0;
+		for var projectile in activeProjectile do{
+			#destroy projectile if player was hit
+			if math.sqrt(math.pow(p.getX()-projectile.getX(),2)+math.pow(p.getY()-projectile.getY(),2)) <= p.getSize() + projectile.getSize() then
+			{
+				if gameDur-invulnDur>=invulnStart then
+				{
+					p.hasBeenHit(projectile.getCollDmg());
+					projToDel.push(projIndex);
+					continue;
+				}
+				
+			} 
+			#destroy projectile if it gets destroyed by bomb shockwave
+			else if bombActive then 
+			{
+					if math.sqrt(math.pow(bombLoc[0]-projectile.getX(),2)+math.pow(bombLoc[1]-projectile.getY(),2)) <= math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))),2)) + projectile.getSize()
+					and math.sqrt(math.pow(bombLoc[0]-projectile.getX(),2)+math.pow(bombLoc[1]-projectile.getY(),2)) > math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))-60),2)) + projectile.getSize()
+					then
+					{
+						projectile.draw(true);
+						continue;
+						
+					}
+					else if math.sqrt(math.pow(bombLoc[0]-projectile.getX(),2)+math.pow(bombLoc[1]-projectile.getY(),2)) <= math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))-60),2)) + projectile.getSize()
+					and math.sqrt(math.pow(bombLoc[0]-projectile.getX(),2)+math.pow(bombLoc[1]-projectile.getY(),2)) > math.sqrt(math.pow((((gameDur-bombTriggeredAt)*(pyth/bombSpeed))-120),2)) + projectile.getSize() 
+					then
+					{
+						projToDel.push(projIndex);
+						projectile.draw(true);
+						continue;
+					}
+			}
+			
+			#destroy projectile if it hits en enemy
+			else if enemysCanBeHit then
+			{
+				var initNumOfActEnem = activeEnemy.size();
+				var whileIndex = 0;
+				
+				while whileIndex < initNumOfActEnem do
+				{
+					if math.sqrt(math.pow(activeEnemy[whileIndex].getX()-projectile.getX(),2)+math.pow(activeEnemy[whileIndex].getY()-projectile.getY(),2)) <= activeEnemy[whileIndex].getSize() + projectile.getSize() then{
+							activeEnemy.remove(whileIndex);
+							initNumOfActEnem-=1;
+							if whileIndex>=1 then whileIndex-=1;
+							score+=1;
+							projToDel.push(projIndex);
+					}
+					if whileIndex<initNumOfActEnem then whileIndex +=1;
+				}
+			#destroy projectile if it moves out of screen
+			}
+			else if projectile.getX()>canvas.width() or projectile.getX()<0 or projectile.getY()>canvas.height() 
+			or projectile.getY()<0 then{
+					projToDel.push(projIndex);
+					continue;
+			}
+			projectile.draw();
+			projIndex+=1;
+			
+		}
+		
+		for var g in projToDel do activeProjectile.remove(g);
+		
+		
+		for var enemy in activeEnemy do{
+			enemy.draw(p.getX(),p.getY());
+			if math.sqrt(math.pow(p.getX()-enemy.getX(),2)+math.pow(p.getY()-enemy.getY(),2)) <= p.getSize() + enemy.getSize()*2 then{
+				if gameDur-invulnDur>=invulnStart then{
+					p.hasBeenHit(enemy.getCollDmg());
+				}
+			}
+			if gameDur%enemy.getFirerate()==0 then{ #enemys launch projectiles every x(fireRate) ticks
+				enemy.launchPro();	
+			}
+			
+		}
+		
+		#PowerUp handling		
+		var powerUpToDel=[];
+		var powerUpIndex=0;
+		for var powerUp in activePowerUp do {
+			if math.sqrt(math.pow(p.getX()-powerUp.getX(),2)+math.pow(p.getY()-powerUp.getY(),2)) <= p.getSize() + powerUp.getSize()*2 then{
+				powerUpToDel.push(powerUpIndex);
+				powerUp.trigger();
+			}
+			powerUp.draw();	
+			powerUpIndex+=1;
+		}
+		for var f in powerUpToDel do activePowerUp.remove(f);
+		checkGameEffects();
+		
+		
+		p.draw();
+		drawBomb();
+		
+		drawUI();
+		
+	}else{
+		pauseDur+=1;
+		drawMenu();
+	}
+}
+}
+																							# Gameloop eventMode
+																							# and eventHandler
+setEventHandler("canvas.mousemove",moveToMouse);
+setEventHandler("canvas.keydown",keyInputHandler);
+setEventHandler("timer",onTick);
+enterEventMode();
+
