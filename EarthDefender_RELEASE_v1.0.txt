@@ -1332,7 +1332,7 @@ function onTick(event){
 		var projIndex=0;
 		for var projectile in activeProjectile do{
 			#destroy projectile if player was hit
-			if math.sqrt(math.pow(p.getX()-projectile.getX(),2)+math.pow(p.getY()-projectile.getY(),2)) <= p.getSize() + projectile.getSize() then
+			if math.sqrt(math.pow(p.getX()-projectile.getX(),2)+math.pow(p.getY()-projectile.getY(),2)) <= p.getSize()*0.6 + projectile.getSize() then
 			{
 				if gameDur-invulnDur>=invulnStart then
 				{
@@ -1363,7 +1363,7 @@ function onTick(event){
 					}
 			}
 			
-			#destroy projectile if it hits en enemy
+			#destroy projectile if it hits an enemy
 			else if enemysCanBeHit then
 			{
 				var initNumOfActEnem = activeEnemy.size();
