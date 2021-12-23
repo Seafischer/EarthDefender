@@ -1217,6 +1217,7 @@ function resetGameState(){
 		score = 0;
 		activeEnemy=[];
 		activeProjectile=[];
+		activePowerUp=[];
 		playerDead = false;
 		lastMousePos = [];
 		lastMouseTick=[];
@@ -1439,4 +1440,3 @@ setEventHandler("canvas.mousemove",moveToMouse);
 setEventHandler("canvas.keydown",keyInputHandler);
 setEventHandler("timer",onTick);
 enterEventMode();
-
