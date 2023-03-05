@@ -156,8 +156,8 @@ for var i in 0:(sampleRate) do
     r_samples.push(sin( i * (r_freq / sampleRate) * 2.5 * pi()));
 }
 
-var sound = StereoSound(l_samples, r_samples, sampleRate);
-var sound2 = StereoSound(l_samples, r_samples, 20000);
+#var sound = StereoSound(l_samples, r_samples, sampleRate);
+#var sound2 = StereoSound(l_samples, r_samples, 20000);
 
 #------------------------------End of Sounds-------------------------------------------#
 
@@ -655,9 +655,9 @@ class Player{
 				lastHit=gameDur;
 				health-=damage;	
 				invulnStart=gameDur;
-				if playBGM then{
-					sound2.play();
-				}
+				#if playBGM then{
+				#	sound2.play();
+				#}
 			}
 		}	
 		
@@ -899,7 +899,8 @@ class Enemy{
 		
 		function prepReloadAnimation(){
 			var temp=[];
-			var size = size+2;
+			var size = 0;
+			size+=2;
 			reloadAnimPoints.push([x,y+size]);
 			for var i in 0:fireRate/reloadAnimInterval do{
 				var blockSize = 180/(fireRate/reloadAnimInterval);
@@ -1273,8 +1274,8 @@ function keyInputHandler (event){
 }
 																							# Gameloop onTick
 function onTick(event){
-	if playBGM and not sound.looping() then sound.startLoop();
-	else if not playBGM and sound.looping() then sound.stopLoop();
+	#if playBGM and not sound.looping() then sound.startLoop();
+	#else if not playBGM and sound.looping() then sound.stopLoop();
 	if not paused then{
 		for var i in 0:starPos.size() do{
 			if starPos[i][1] < 1 then {
